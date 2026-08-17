@@ -2,7 +2,9 @@
 from flask import Flask, request
 import os
 from dotenv import load_dotenv
-from handlers import handle_update, auto_refresh, send_duty_reminders, daily_checkup
+from conversation import handle_update
+from features.status import auto_refresh, send_duty_reminders
+from features.misc import daily_checkup
 
 load_dotenv()
 

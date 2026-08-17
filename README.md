@@ -113,6 +113,6 @@ Use [ngrok](https://ngrok.com) to expose `localhost:8080` if you want to test th
 
 ## Notes for handover
 
-- A few commands (`/eatwhat`, `/gay`, the wellbeing flow) contain hardcoded personalised jokes for specific RA names. Search `handlers.py` for those names if you want to remove or update them.
-- `handlers.py` is a single ~800-line file — if you plan to add features, splitting it by domain (commands, swap/cover, RAG, telegram I/O) is recommended.
+- A few commands (`/eatwhat`, `/gay`, the wellbeing flow) contain hardcoded personalised jokes for specific RA names. Search `features/misc.py` for those names if you want to remove or update them.
+- The old monolithic `handlers.py` has been split by domain: `conversation.py` is the main Telegram conversation handler (webhook routing, command/reply dispatch), `config.py`/`telegram_api.py` hold shared env vars and send/lookup helpers, and `features/` has one file per feature group — `status.py` (IN/OUT, duty schedule, reminders), `swap.py` (swap/cover duty), `myra.py` (RAG assistant + training), `misc.py` (jokes, help, wellbeing check-in).
 - There's a `PersonalLeave.docx` template file in `bot/` from a previously-removed feature; safe to delete if you want to clean up.
