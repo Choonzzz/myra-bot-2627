@@ -14,6 +14,10 @@ client = OpenAI(
 TELEGRAM_TOKEN = os.getenv("BOT_TOKEN")
 TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 GROUP_CHAT_ID = os.getenv("GROUP_CHAT_ID")
+
+# The group has Topics enabled; all bot messages to the group are routed into this
+# topic thread rather than the General thread. Update if the topic changes.
+GROUP_TOPIC_ID = 2146
 FRIEND_TELEGRAM_IDS = json.loads(os.getenv("FRIEND_TELEGRAM_MAPPINGS"))
 MONGO_URI = os.getenv("MONGO_URI")
 
