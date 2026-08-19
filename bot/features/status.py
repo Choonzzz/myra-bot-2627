@@ -113,10 +113,16 @@ def try_handle_reply(chat_id, text, user_id, user_name):
             r.hdel("waiting_for_schedule", str(user_id))
             return True
 
-        print(json_data)
-        r.set("duty_schedule", json.dumps(json_data))
+        try:
+            r.set("duty_schedule", json.dumps(json_data))
+        except Exception:
+            send_message(chat_id, "❌ Failed to save the schedule (storage error). Please try again.")
+            r.hdel("waiting_for_schedule", str(user_id))
+            return True
+
         r.hdel("waiting_for_schedule", str(user_id))
-        send_message(chat_id, "✅ Duty schedule updated successfully!")
+        schedule_lines = "\n".join(f"{k}: {v}" for k, v in json_data.items())
+        send_message(chat_id, f"✅ Duty schedule updated successfully!\n\n*📅 New Schedule:*\n{schedule_lines}")
         return True
     return False
 
