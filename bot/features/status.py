@@ -106,6 +106,13 @@ def try_handle_reply(chat_id, text, user_id, user_name):
                 r.hdel("waiting_for_schedule", str(user_id))
                 return True
 
+        if not isinstance(json_data, dict) or not all(
+            isinstance(k, str) and isinstance(v, str) for k, v in json_data.items()
+        ):
+            send_message(chat_id, "❌ Schedule must be a JSON object mapping slot names to RA names, e.g. `{\"Jul 24 (Thu) PM\": \"Alycia\"}`. Please try again.")
+            r.hdel("waiting_for_schedule", str(user_id))
+            return True
+
         print(json_data)
         r.set("duty_schedule", json.dumps(json_data))
         r.hdel("waiting_for_schedule", str(user_id))
