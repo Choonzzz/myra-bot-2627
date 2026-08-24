@@ -126,24 +126,33 @@ def cmd_start(chat_id, args, user_id, user_name):
 def cmd_help(chat_id, args, user_id, user_name):
     msg = """🤖 *Bot Commands:*
 
+# Attendance
 • `/in` – Mark yourself IN ✅
 • `/out` – Mark yourself OUT ❌
 • `/status` – Show everyone's status
-• `/refresh` – Ask all users to update whether they're IN or OUT
+
+# Duties
 • `/view_schedule` – View full duty schedule
 • `/view_mine` – View your assigned slots
-• `/update_schedule` – Replace schedule (admin)
-• `/dutyramessage [AM|PM]` – Generate the duty RA message
 • `/swap_duty` – Start duty swap request
 • `/swap <name>` – Request a swap with a specific person
 • `/cover_duty` – Cover someone's duty slot
-• `/askmyra <question>` – Ask Myra a question
-• `/trainmyra <text>` – Train Myra with text (or send a file/photo)
+• `/dutyramessage [AM|PM]` – Generate the duty RA message, delete AM/PM where applicable
+
+# Admin Usage
+• `/refresh` – Ask all users to update whether they're IN or OUT
+• `/update_schedule` – Replace schedule
+
+# Fluff
 • `/eatwhat` – Get a random food suggestion
 • `/gay` – Check how gay you are
+• `/thankyou(name)` – thank someone
 • `/help` – Show this list"""
     send_message(chat_id, msg)
 
+# Put this back in if you ever make this work again.
+# • `/askmyra <question>` – Ask Myra a question
+# • `/trainmyra <text>` – Train Myra with text (or send a file/photo)
 
 def cmd_eatwhat(chat_id, args, user_id, user_name):
     options = [
@@ -190,8 +199,8 @@ def cmd_gay(chat_id, args, user_id, user_name):
 
 def cmd_thankyou(chat_id, cmd, user_id, user_name):
     """cmd is the full command string, e.g. '/thankyoualycia'."""
-    person = cmd.split("/thankyou")[1]
-    send_message(chat_id, f'WOW THANK YOU SO MUCH {person.upper()} FOR YOUR SERVICE. MYRA COMMENDS YOU')
+    person = cmd.split("/thankyou")[1] or " "
+    send_message(chat_id, f'WOW THANK YOU SO MUCH{person.upper()} FOR YOUR SERVICE. MYRA COMMENDS YOU')
 
 
 def daily_checkup():
