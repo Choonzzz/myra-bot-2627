@@ -2,13 +2,13 @@
 import json
 
 from redis_client import load_duty_schedule, get_redis
-from config import GROUP_CHAT_ID, FRIEND_TELEGRAM_IDS
+from config import GROUP_CHAT_ID, FRIEND_TELEGRAM_IDS, ordered_friend_names
 from telegram_api import send_message, inline_keyboard, edit_message_reply_markup
 
 
 def cmd_swap_duty(chat_id, args, user_id, user_name):
-    msg = "🔁 *Who do you want to swap with?*\n" + "\n".join([f"• {name} → type `/swap {name}`" for name in FRIEND_TELEGRAM_IDS])
-    send_message(chat_id, msg)
+    msg = "🔁 *Who do you want to swap with?*\n" + "\n".join([f"• {name} → type `/swap {name}`" for name in ordered_friend_names()])
+    send_message(chat_id, msg, reply_markup=inline_keyboard([[("❌ Cancel", "cancel:swap")]]))
 
 
 def cmd_swap(chat_id, args, user_id, user_name):
@@ -166,7 +166,7 @@ def try_handle_callback(data, chat_id, user_id, message_id):
     if data == "cancel:swap":
         r.hdel("user_swap_state", str(user_id))
         edit_message_reply_markup(chat_id, message_id)
-        send_message(chat_id, "❌ Swap request cancelled.")
+        send_message(chat_id, "❌ Swap cancelled.")
         return True
 
     if data in ("swap_resp:yes", "swap_resp:no"):

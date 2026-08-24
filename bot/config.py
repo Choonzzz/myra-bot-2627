@@ -17,8 +17,35 @@ GROUP_CHAT_ID = os.getenv("GROUP_CHAT_ID")
 
 # The group has Topics enabled; all bot messages to the group are routed into this
 # topic thread rather than the General thread. Update if the topic changes.
-GROUP_TOPIC_ID = 2146
+GROUP_TOPIC_ID = 2146 # points to choon corner
 FRIEND_TELEGRAM_IDS = json.loads(os.getenv("FRIEND_TELEGRAM_MAPPINGS"))
+
+# Explicit display order for RA names in listings (e.g. /swap_duty), independent
+# of whatever order FRIEND_TELEGRAM_MAPPINGS happens to be written in. Reorder
+# this list to change it. Defaults to the mapping's own order if left as-is.
+RA_DISPLAY_ORDER = ["Anderson",
+                    "Shi Hui",
+                    "Zedd",
+                    "Siyu",
+                    "Brendon",
+                    "Nicole",
+                    "Kasthuri",
+                    "Yap Han",
+                    "Don",
+                    "Liya",
+                    "Jin Xian",
+                    "Jeana",
+                    "Choon Heng",
+                    "Lex"]
+
+def ordered_friend_names():
+    """Friend names in RA_DISPLAY_ORDER, with any names missing from that list
+    (e.g. newly added to FRIEND_TELEGRAM_MAPPINGS but not yet to the order list)
+    appended at the end so nobody is silently dropped from listings."""
+    ordered = [name for name in RA_DISPLAY_ORDER if name in FRIEND_TELEGRAM_IDS]
+    remaining = [name for name in FRIEND_TELEGRAM_IDS if name not in RA_DISPLAY_ORDER]
+    return ordered + remaining
+
 MONGO_URI = os.getenv("MONGO_URI")
 
 # Singapore timezone, shared by scheduler.py and any feature that needs local time
