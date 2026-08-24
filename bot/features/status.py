@@ -5,7 +5,7 @@ import json
 from redis_client import load_duty_schedule, get_redis
 from scheduler import should_trigger_refresh
 from config import GROUP_CHAT_ID, FRIEND_TELEGRAM_IDS, SGT
-from telegram_api import send_message
+from telegram_api import send_message, inline_keyboard, edit_message_reply_markup
 
 
 def cmd_in(chat_id, args, user_id, user_name):
@@ -64,7 +64,11 @@ def cmd_update_schedule(chat_id, args, user_id, user_name):
         send_message(chat_id, "❌ Only allowed in group chat.")
     else:
         r.hset("waiting_for_schedule", str(user_id), "true")
-        send_message(chat_id, "📤 Please send the full duty schedule as JSON.\n\nExample:\n```json\n{\"Jul 24 (Thu) PM\": \"Alycia\"}```")
+        send_message(
+            chat_id,
+            "📤 Please send the full duty schedule as JSON.\n\nExample:\n```json\n{\"Jul 24 (Thu) PM\": \"Alycia\"}```",
+            reply_markup=inline_keyboard([[("❌ Cancel", "cancel:schedule")]])
+        )
 
 
 def cmd_dutyramessage(chat_id, args, user_id, user_name):
@@ -123,6 +127,17 @@ def try_handle_reply(chat_id, text, user_id, user_name):
         r.hdel("waiting_for_schedule", str(user_id))
         schedule_lines = "\n".join(f"{k}: {v}" for k, v in json_data.items())
         send_message(chat_id, f"✅ Duty schedule updated successfully!\n\n*📅 New Schedule:*\n{schedule_lines}")
+        return True
+    return False
+
+
+def try_handle_callback(data, chat_id, user_id, message_id):
+    """Handles the Cancel button on the /update_schedule prompt."""
+    if data == "cancel:schedule":
+        r = get_redis()
+        r.hdel("waiting_for_schedule", str(user_id))
+        edit_message_reply_markup(chat_id, message_id)
+        send_message(chat_id, "❌ Schedule update cancelled.")
         return True
     return False
 

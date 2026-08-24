@@ -1,5 +1,5 @@
 # conversation.py
-from telegram_api import send_message, get_user_name_from_id
+from telegram_api import send_message, get_user_name_from_id, answer_callback_query
 from features import status, swap, misc
 # TEMP: myra disabled for local testing (Mongo cluster unreachable).
 # Uncomment once MONGO_URI points to a reachable Atlas cluster.
@@ -14,6 +14,10 @@ COMMANDS = {
 
 
 def handle_update(data):
+    if "callback_query" in data:
+        handle_callback_query(data["callback_query"])
+        return
+
     if "message" not in data:
         return
 
@@ -62,4 +66,24 @@ def handle_reply(chat_id, text, user_id, user_name):
     if swap.try_handle_reply(chat_id, text, user_id, user_name):
         return
     if misc.try_handle_reply(chat_id, text, user_id, user_name):
+        return
+
+
+def handle_callback_query(callback_query):
+    callback_id = callback_query["id"]
+    user_id = callback_query["from"]["id"]
+    chat_id = callback_query["message"]["chat"]["id"]
+    message_id = callback_query["message"]["message_id"]
+    data = callback_query.get("data", "")
+    user_name = get_user_name_from_id(user_id)
+
+    answer_callback_query(callback_id)
+
+    # Allowlist: only users in FRIEND_TELEGRAM_MAPPINGS can use the bot
+    if user_name == "Unknown User":
+        return
+
+    if status.try_handle_callback(data, chat_id, user_id, message_id):
+        return
+    if swap.try_handle_callback(data, chat_id, user_id, message_id):
         return

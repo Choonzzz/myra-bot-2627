@@ -3,7 +3,7 @@ import json
 
 from redis_client import load_duty_schedule, get_redis
 from config import GROUP_CHAT_ID, FRIEND_TELEGRAM_IDS
-from telegram_api import send_message
+from telegram_api import send_message, inline_keyboard, edit_message_reply_markup
 
 
 def cmd_swap_duty(chat_id, args, user_id, user_name):
@@ -27,7 +27,7 @@ def cmd_swap(chat_id, args, user_id, user_name):
         msg += f"{i}. {duty}\n"
     msg += "\n📝 Reply to this message with the number of your choice."
     r.hset("user_swap_state", str(user_id), target)
-    send_message(chat_id, msg)
+    send_message(chat_id, msg, reply_markup=inline_keyboard([[("❌ Cancel", "cancel:swap")]]))
 
 
 def cmd_cover_duty(chat_id, args, user_id, user_name):
@@ -41,7 +41,7 @@ def cmd_cover_duty(chat_id, args, user_id, user_name):
         msg += f"{i}. {slot} ({name})\n"
     msg += "\n📝 Reply to this message with the number of your choice."
     r.hset("user_cover_state", str(user_id), "waiting_for_slot_choice")
-    send_message(chat_id, msg)
+    send_message(chat_id, msg, reply_markup=inline_keyboard([[("❌ Cancel", "cancel:cover")]]))
 
 
 def _try_handle_cover_reply(r, chat_id, text, user_id, user_name):
@@ -95,7 +95,7 @@ def _try_handle_swap_choice_reply(r, chat_id, text, user_id, user_name):
 
                 new_state = f"{target}|{target_slot}"
                 r.hset("user_swap_state", str(user_id), new_state)
-                send_message(chat_id, msg)
+                send_message(chat_id, msg, reply_markup=inline_keyboard([[("❌ Cancel", "cancel:swap")]]))
             else:
                 send_message(chat_id, "❌ Invalid choice.")
         except ValueError:
@@ -129,10 +129,10 @@ def _try_handle_swap_choice_reply(r, chat_id, text, user_id, user_name):
 👤 From: {user_name}
 📅 They want to swap:
    • Your: {target_slot}
-   • Their: {requester_slot}
-
-Reply with *Yes* or *No*"""
-                send_message(target_chat_id, msg)
+   • Their: {requester_slot}"""
+                send_message(target_chat_id, msg, reply_markup=inline_keyboard(
+                    [[("✅ Yes", "swap_resp:yes"), ("❌ No", "swap_resp:no")]]
+                ))
                 send_message(chat_id, f"📨 Swap request sent to {target}!")
                 r.hdel("user_swap_state", str(user_id))
             else:
@@ -142,41 +142,58 @@ Reply with *Yes* or *No*"""
     return True
 
 
-def _try_handle_swap_response_reply(r, chat_id, text, user_id, user_name):
-    active = r.hget("active_swap_requests", str(user_id))
-    if not active:
-        return False
-
-    text_l = text.lower()
-    if text_l not in ["yes", "y", "no", "n"]:
-        return True
-
-    swap_data = json.loads(active.decode() if isinstance(active, bytes) else active)
-    if text_l in ["yes", "y"]:
-        duty_schedule = json.loads(r.get("duty_schedule") or '{}')
-        duty_schedule[swap_data["requester_slot"]] = swap_data["target"]
-        duty_schedule[swap_data["target_slot"]] = swap_data["requester"]
-        r.set("duty_schedule", json.dumps(duty_schedule))
-        msg = f"✅ *Duty Swap Completed!*\n\n📅 {swap_data['requester_slot']}: {swap_data['target']}\n📅 {swap_data['target_slot']}: {swap_data['requester']}"
-        send_message(chat_id, msg)
-        send_message(swap_data["requester_chat_id"], msg)
-        send_message(GROUP_CHAT_ID, msg)
-    else:
-        send_message(chat_id, "✅ You declined the swap request.")
-        send_message(swap_data["requester_chat_id"], f"❌ {swap_data['target']} declined the swap request.")
-    r.hdel("active_swap_requests", str(user_id))
-    return True
-
-
 def try_handle_reply(chat_id, text, user_id, user_name):
-    """Handles cover-slot choice, swap-slot choice, and swap yes/no response replies, in that order."""
+    """Handles cover-slot choice and swap-slot choice replies, in that order."""
     r = get_redis()
     if _try_handle_cover_reply(r, chat_id, text, user_id, user_name):
         return True
     if _try_handle_swap_choice_reply(r, chat_id, text, user_id, user_name):
         return True
-    if _try_handle_swap_response_reply(r, chat_id, text, user_id, user_name):
+    return False
+
+
+def try_handle_callback(data, chat_id, user_id, message_id):
+    """Handles the Cancel button on /cover_duty and /swap prompts, and the
+    Yes/No buttons on a swap request DM."""
+    r = get_redis()
+
+    if data == "cancel:cover":
+        r.hdel("user_cover_state", str(user_id))
+        edit_message_reply_markup(chat_id, message_id)
+        send_message(chat_id, "❌ Cover duty cancelled.")
         return True
+
+    if data == "cancel:swap":
+        r.hdel("user_swap_state", str(user_id))
+        edit_message_reply_markup(chat_id, message_id)
+        send_message(chat_id, "❌ Swap request cancelled.")
+        return True
+
+    if data in ("swap_resp:yes", "swap_resp:no"):
+        active = r.hget("active_swap_requests", str(user_id))
+        if not active:
+            edit_message_reply_markup(chat_id, message_id)
+            return True
+
+        swap_data = json.loads(active.decode() if isinstance(active, bytes) else active)
+        edit_message_reply_markup(chat_id, message_id)
+
+        if data == "swap_resp:yes":
+            duty_schedule = json.loads(r.get("duty_schedule") or '{}')
+            duty_schedule[swap_data["requester_slot"]] = swap_data["target"]
+            duty_schedule[swap_data["target_slot"]] = swap_data["requester"]
+            r.set("duty_schedule", json.dumps(duty_schedule))
+            msg = f"✅ *Duty Swap Completed!*\n\n📅 {swap_data['requester_slot']}: {swap_data['target']}\n📅 {swap_data['target_slot']}: {swap_data['requester']}"
+            send_message(chat_id, msg)
+            send_message(swap_data["requester_chat_id"], msg)
+            send_message(GROUP_CHAT_ID, msg)
+        else:
+            send_message(chat_id, "✅ You declined the swap request.")
+            send_message(swap_data["requester_chat_id"], f"❌ {swap_data['target']} declined the swap request.")
+
+        r.hdel("active_swap_requests", str(user_id))
+        return True
+
     return False
 
 
