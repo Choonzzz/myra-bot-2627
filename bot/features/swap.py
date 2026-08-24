@@ -25,7 +25,7 @@ def cmd_swap(chat_id, args, user_id, user_name):
     msg = f"📋 *{target}'s Duties - Choose one to swap:*\n\n"
     for i, duty in enumerate(target_duties, 1):
         msg += f"{i}. {duty}\n"
-    msg += "\n📝 Reply with the number of your choice."
+    msg += "\n📝 Reply to this message with the number of your choice."
     r.hset("user_swap_state", str(user_id), target)
     send_message(chat_id, msg)
 
@@ -39,7 +39,7 @@ def cmd_cover_duty(chat_id, args, user_id, user_name):
     msg = "📋 *All Duty Slots - Choose one to cover:*\n\n"
     for i, (slot, name) in enumerate(duty_schedule.items(), 1):
         msg += f"{i}. {slot} ({name})\n"
-    msg += "\n📝 Reply with the number of your choice."
+    msg += "\n📝 Reply to this message with the number of your choice."
     r.hset("user_cover_state", str(user_id), "waiting_for_slot_choice")
     send_message(chat_id, msg)
 
@@ -91,7 +91,7 @@ def _try_handle_swap_choice_reply(r, chat_id, text, user_id, user_name):
                 msg = "🔄 *Your Duties - Choose which to swap:*\n"
                 for i, duty in enumerate(requester_duties, 1):
                     msg += f"{i}. {duty}\n"
-                msg += "\n📝 Reply with the number of your choice."
+                msg += "\n📝 Reply to this message with the number of your choice."
 
                 new_state = f"{target}|{target_slot}"
                 r.hset("user_swap_state", str(user_id), new_state)
