@@ -198,8 +198,8 @@ def cmd_gay(chat_id, args, user_id, user_name):
 
 def cmd_thankyou(chat_id, cmd, user_id, user_name):
     """cmd is the full command string, e.g. '/thankyoualycia'."""
-    person = cmd.split("/thankyou")[1]
-    send_message(chat_id, f'WOW THANK YOU SO MUCH {person.upper()} FOR YOUR SERVICE. MYRA COMMENDS YOU')
+    person = cmd.split("/thankyou")[1].strip()
+    send_message(chat_id, f'WOW THANK YOU SO MUCH {person.upper() + " " if person else ""}FOR YOUR SERVICE. MYRA COMMENDS YOU')
 
 
 def daily_checkup():

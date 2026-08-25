@@ -17,7 +17,7 @@ GROUP_CHAT_ID = os.getenv("GROUP_CHAT_ID")
 
 # The group has Topics enabled; all bot messages to the group are routed into this
 # topic thread rather than the General thread. Update if the topic changes.
-GROUP_TOPIC_ID = 2146 # points to choon corner
+GROUP_TOPIC_ID = 1 # points to choon corner
 FRIEND_TELEGRAM_IDS = json.loads(os.getenv("FRIEND_TELEGRAM_MAPPINGS"))
 
 # Explicit display order for RA names in listings (e.g. /swap_duty), independent
