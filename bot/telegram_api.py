@@ -9,7 +9,7 @@ def send_message(chat_id, text, parse_mode="Markdown", reply_markup=None):
         "text": text,
         "parse_mode": parse_mode
     }
-    if str(chat_id) == GROUP_CHAT_ID:
+    if str(chat_id) == GROUP_CHAT_ID and GROUP_TOPIC_ID is not None:
         payload["message_thread_id"] = GROUP_TOPIC_ID
     if reply_markup:
         payload["reply_markup"] = reply_markup
