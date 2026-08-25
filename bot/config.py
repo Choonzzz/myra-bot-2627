@@ -34,6 +34,7 @@ RA_DISPLAY_ORDER = ["Anderson",
                     "Don",
                     "Liya",
                     "Jin Xian",
+                    "Zhen Jie",
                     "Jeana",
                     "Choon Heng",
                     "Lex"]

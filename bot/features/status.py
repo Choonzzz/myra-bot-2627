@@ -26,7 +26,6 @@ def cmd_status(chat_id, args, user_id, user_name):
     r = get_redis()
     statuses = r.hgetall("user_status")
     listStatus = [(k, v) for k, v in statuses.items()]
-    listStatus.sort()
     msg = "📋 *Current Status:*\n" + "\n".join([f"{k}: {v}" for k, v in listStatus]) if statuses else "No updates yet."
 
     duty_schedule = load_duty_schedule()
