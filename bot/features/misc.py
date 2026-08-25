@@ -127,8 +127,7 @@ def cmd_help(chat_id, args, user_id, user_name):
     msg = """🤖 *Bot Commands:*
 
 # Attendance
-• `/in` – Mark yourself IN ✅
-• `/out` – Mark yourself OUT ❌
+• `/attendance` – Mark yourself IN or OUT via buttons
 • `/status` – Show everyone's status
 
 # Duties
@@ -139,15 +138,15 @@ def cmd_help(chat_id, args, user_id, user_name):
 • `/cover_duty` – Cover someone's duty slot
 • `/dutyramessage [AM|PM]` – Generate the duty RA message, delete AM/PM where applicable
 
-# Admin Usage
-• `/refresh` – Ask all users to update whether they're IN or OUT
-• `/update_schedule` – Replace schedule
-
 # Fluff
 • `/eatwhat` – Get a random food suggestion
 • `/gay` – Check how gay you are
 • `/thankyou(name)` – thank someone
-• `/help` – Show this list"""
+• `/help` – Show this list
+
+# Admin Usage
+• `/refresh` – Ask all users to update whether they're IN or OUT
+• `/update_schedule` – Replace schedule"""
     send_message(chat_id, msg)
 
 # Put this back in if you ever make this work again.
@@ -174,7 +173,7 @@ def cmd_eatwhat(chat_id, args, user_id, user_name):
         "WaaCow",
         "Bismillah",
         "Hwang's",
-        "LiXin noodles",
+        "Mala mala",
         "Royals Bistro",
         "FF mala",
         "FF jap x western fusion",
@@ -192,15 +191,15 @@ def cmd_eatwhat(chat_id, args, user_id, user_name):
 
 
 def cmd_gay(chat_id, args, user_id, user_name):
-    num = random.randint(75, 100)
+    num = random.randint(50, 110)
     msg = f"{user_name} is {num}% gay!"
     send_message(chat_id, msg)
 
 
 def cmd_thankyou(chat_id, cmd, user_id, user_name):
     """cmd is the full command string, e.g. '/thankyoualycia'."""
-    person = cmd.split("/thankyou")[1] or " "
-    send_message(chat_id, f'WOW THANK YOU SO MUCH{person.upper()} FOR YOUR SERVICE. MYRA COMMENDS YOU')
+    person = cmd.split("/thankyou")[1]
+    send_message(chat_id, f'WOW THANK YOU SO MUCH {person.upper()} FOR YOUR SERVICE. MYRA COMMENDS YOU')
 
 
 def daily_checkup():
@@ -215,7 +214,7 @@ def try_handle_reply(chat_id, text, user_id, user_name):
     wellbeing = r.hget("wellbeing_questions", str(user_name))
     if wellbeing:
         print("wellbeing reply")
-        send_message(user_id, random.choice(RESPONSE_TONE_SCALE))
+        send_message(chat_id, random.choice(RESPONSE_TONE_SCALE))
         r.hdel("wellbeing_questions", str(user_name))
         return True
     return False

@@ -4,28 +4,23 @@ import json
 
 from redis_client import load_duty_schedule, get_redis
 from scheduler import should_trigger_refresh
-from config import GROUP_CHAT_ID, FRIEND_TELEGRAM_IDS, SGT
+from config import GROUP_CHAT_ID, FRIEND_TELEGRAM_IDS, RA_DISPLAY_ORDER, ADMIN_NAMES, SGT
 from telegram_api import send_message, inline_keyboard, edit_message_reply_markup
 
 
-def cmd_in(chat_id, args, user_id, user_name):
-    r = get_redis()
-    r.hset("user_status", user_name, "IN")
-    r.hset("user_id_map", user_name, str(user_id))
-    send_message(chat_id, f"{user_name} is now IN ✅")
+def _attendance_keyboard():
+    return inline_keyboard([[("✅ IN", "attendance:in"), ("❌ OUT", "attendance:out")]])
 
-
-def cmd_out(chat_id, args, user_id, user_name):
-    r = get_redis()
-    r.hset("user_status", user_name, "OUT")
-    r.hset("user_id_map", user_name, str(user_id))
-    send_message(chat_id, f"{user_name} is now OUT ❌")
-
+def cmd_attendance(chat_id, args, user_id, user_name):
+    send_message(chat_id, "📋 Update your attendance:", reply_markup=_attendance_keyboard())
 
 def cmd_status(chat_id, args, user_id, user_name):
     r = get_redis()
     statuses = r.hgetall("user_status")
-    listStatus = [(k, v) for k, v in statuses.items()]
+    listStatus = sorted(
+        statuses.items(),
+        key=lambda kv: RA_DISPLAY_ORDER.index(kv[0]) if kv[0] in RA_DISPLAY_ORDER else len(RA_DISPLAY_ORDER)
+    )
     msg = "📋 *Current Status:*\n" + "\n".join([f"{k}: {v}" for k, v in listStatus]) if statuses else "No updates yet."
 
     duty_schedule = load_duty_schedule()
@@ -35,9 +30,12 @@ def cmd_status(chat_id, args, user_id, user_name):
 
 
 def cmd_refresh(chat_id, args, user_id, user_name):
+    if user_name not in ADMIN_NAMES:
+        send_message(chat_id, "❌ Only admins can use this command.")
+        return
     for user, uid in FRIEND_TELEGRAM_IDS.items():
         print(user, uid)
-        send_message(uid, f"👋 Hi {user}, please reply /in or /out to update your status. Select IN if you will be in RC4 during the upcoming duty slot. Else select OUT. Thank you :)")
+        send_message(uid, f"👋 Hi {user}, please update your status. Select IN if you will be in RC4 during the upcoming duty slot. Else select OUT. Thank you :)", reply_markup=_attendance_keyboard())
     send_message(chat_id, "🔄 Asking all members to update...")
 
 
@@ -59,8 +57,8 @@ def cmd_view_mine(chat_id, args, user_id, user_name):
 
 def cmd_update_schedule(chat_id, args, user_id, user_name):
     r = get_redis()
-    if str(chat_id) != GROUP_CHAT_ID and int(chat_id) > 0:
-        send_message(chat_id, "❌ Only allowed in group chat.")
+    if user_name not in ADMIN_NAMES:
+        send_message(chat_id, "❌ Only admins can use this command.")
     else:
         r.hset("waiting_for_schedule", str(user_id), "true")
         send_message(
@@ -130,14 +128,26 @@ def try_handle_reply(chat_id, text, user_id, user_name):
     return False
 
 
-def try_handle_callback(data, chat_id, user_id, message_id):
-    """Handles the Cancel button on the /update_schedule prompt."""
+def try_handle_callback(data, chat_id, user_id, message_id, user_name):
+    """Handles the Cancel button on the /update_schedule prompt and the
+    IN/OUT buttons on the /attendance prompt."""
     if data == "cancel:schedule":
         r = get_redis()
         r.hdel("waiting_for_schedule", str(user_id))
         edit_message_reply_markup(chat_id, message_id)
         send_message(chat_id, "❌ Schedule update cancelled.")
         return True
+
+    if data in ("attendance:in", "attendance:out"):
+        status_value = "IN" if data == "attendance:in" else "OUT"
+        r = get_redis()
+        r.hset("user_status", user_name, status_value)
+        r.hset("user_id_map", user_name, str(user_id))
+        edit_message_reply_markup(chat_id, message_id)
+        emoji = "✅" if status_value == "IN" else "❌"
+        send_message(chat_id, f"{user_name} is now {status_value} {emoji}")
+        return True
+
     return False
 
 
@@ -152,7 +162,7 @@ def auto_refresh():
                 closing = "Duty RA for " + slot + " is " + person + "."
         for user, uid in user_ids.items():
             print(user, uid)
-            send_message(uid, f"👋 Hi {user}, please reply /in or /out to update your status. Select IN if you will be in RC4 during the upcoming duty slot. Else select OUT. Thank you :)\n(Auto-sent for duty RA)\n{closing}")
+            send_message(uid, f"👋 Hi {user}, please update your status. Select IN if you will be in RC4 during the upcoming duty slot. Else select OUT. Thank you :)\n(Auto-sent for duty RA)\n{closing}", reply_markup=_attendance_keyboard())
 
 
 def send_duty_reminders():
@@ -188,8 +198,7 @@ def send_duty_reminders():
 
 
 COMMANDS = {
-    "/in": cmd_in,
-    "/out": cmd_out,
+    "/attendance": cmd_attendance,
     "/status": cmd_status,
     "/refresh": cmd_refresh,
     "/view_schedule": cmd_view_schedule,

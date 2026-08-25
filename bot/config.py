@@ -39,6 +39,10 @@ RA_DISPLAY_ORDER = ["Anderson",
                     "Choon Heng",
                     "Lex"]
 
+# Names allowed to run admin-only commands (e.g. /refresh, /update_schedule).
+# Reorder or edit this list to change who has admin access.
+ADMIN_NAMES = ["Choon Heng", "Zedd", "Nicole"]
+
 def ordered_friend_names():
     """Friend names in RA_DISPLAY_ORDER, with any names missing from that list
     (e.g. newly added to FRIEND_TELEGRAM_MAPPINGS but not yet to the order list)

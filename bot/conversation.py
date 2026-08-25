@@ -12,7 +12,6 @@ COMMANDS = {
     **misc.COMMANDS,
 }
 
-
 def handle_update(data):
     if "callback_query" in data:
         handle_callback_query(data["callback_query"])
@@ -83,7 +82,7 @@ def handle_callback_query(callback_query):
     if user_name == "Unknown User":
         return
 
-    if status.try_handle_callback(data, chat_id, user_id, message_id):
+    if status.try_handle_callback(data, chat_id, user_id, message_id, user_name):
         return
     if swap.try_handle_callback(data, chat_id, user_id, message_id):
         return
