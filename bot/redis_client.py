@@ -9,3 +9,8 @@ def load_duty_schedule():
     r = get_redis()
     json_data = r.get("duty_schedule")
     return json.loads(json_data or "{}")
+
+def load_schedule(key):
+    r = get_redis()
+    json_data = r.get(key)
+    return json.loads(json_data or "{}")

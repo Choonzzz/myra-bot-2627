@@ -44,6 +44,18 @@ RA_DISPLAY_ORDER = ["Anderson",
 # Reorder or edit this list to change who has admin access.
 ADMIN_NAMES = ["Choon Heng", "Zedd", "Nicole"]
 
+# Schedules selectable from /update_schedule: button label -> Redis key suffix.
+# "duty" maps to the existing "duty_schedule" key; every other suffix maps to
+# "zone_schedule_<suffix>".
+SCHEDULE_TARGETS = {
+    "Admin Duty": "duty",
+    "Aquila": "aquila",
+    "Noctua": "noctua",
+    "Ursa": "ursa",
+    "Leo": "leo",
+    "Draco": "draco",
+}
+
 def ordered_friend_names():
     """Friend names in RA_DISPLAY_ORDER, with any names missing from that list
     (e.g. newly added to FRIEND_TELEGRAM_MAPPINGS but not yet to the order list)
