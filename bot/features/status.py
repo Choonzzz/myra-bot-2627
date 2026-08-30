@@ -58,6 +58,10 @@ def _schedule_redis_key(suffix):
     return "duty_schedule" if suffix == "duty" else f"zone_schedule_{suffix}"
 
 
+def _schedule_label(suffix):
+    return next((label for label, s in SCHEDULE_TARGETS.items() if s == suffix), suffix)
+
+
 def _schedule_selection_keyboard(callback_prefix, cancel_data=None):
     labels = list(SCHEDULE_TARGETS.items())
     rows = [
@@ -74,7 +78,7 @@ def _prompt_schedule_json(chat_id, user_id, suffix):
     r.hset("waiting_for_schedule", str(user_id), suffix)
     send_message(
         chat_id,
-        "📤 Please send the full schedule as JSON.\n\nExample:\n```json\n{\"Jul 24 (Thu) PM\": \"Alycia\"}```",
+        f"📤 Please send the full {_schedule_label(suffix)} schedule as JSON.\n\nExample:\n```json\n{{\"Jul 24 (Thu) PM\": \"Alycia\"}}```",
         reply_markup=inline_keyboard([[("❌ Cancel", "cancel:schedule")]])
     )
 
