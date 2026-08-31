@@ -90,28 +90,49 @@ def cmd_update_schedule(chat_id, args, user_id, user_name):
         send_message(chat_id, "📋 Which schedule do you want to update?", reply_markup=_schedule_selection_keyboard("update_target"))
 
 
-def cmd_dutyramessage(chat_id, args, user_id, user_name):
-    r = get_redis()
-    statuses = r.hgetall("user_status")
-    listStatus = [(k, v) for k, v in statuses.items()]
-    listStatus.sort()
+def build_dutyramessage(user_name, duty_slot, include_ra_list=True):
     RAsIn = ""
-    count = 1
-    duty_schedule = load_duty_schedule()
-    if should_trigger_refresh(duty_schedule):
-        RAsIn = "\n\nRAs/RFs in the building:\n"
-        for k, v in listStatus:
-            if v == "IN":
-                RAsIn += f"{count}) {k}\n"
-                count += 1
+    if include_ra_list:
+        r = get_redis()
+        statuses = r.hgetall("user_status")
+        listStatus = sorted(statuses.items())
+        duty_schedule = load_duty_schedule()
+        if should_trigger_refresh(duty_schedule):
+            RAsIn = "\n\nRAs/RFs in the building:\n"
+            count = 1
+            for k, v in listStatus:
+                if v == "IN":
+                    RAsIn += f"{count}) {k}\n"
+                    count += 1
+    return f"""I ({user_name}) am the duty RA for {duty_slot}.\n\nI have collected the Duty RA phone from the letterbox. I will be staying in the building until the duty time is over.{RAsIn}
+    """
+
+
+def _slot_to_duty_slot_str(slot):
+    """Convert a duty_schedule key like 'Aug 31 (Mon) PM' into dutyramessage's
+    date format, e.g. '31 Aug 2026 PM'."""
+    parts = slot.rsplit(" ", 1)
+    if len(parts) == 2 and parts[1] in ("AM", "PM"):
+        date_part, ampm = parts
+    else:
+        date_part, ampm = slot, "PM"
+    date_part = date_part.split(" (")[0]
+    try:
+        year = datetime.datetime.now(SGT).year
+        dt = datetime.datetime.strptime(f"{date_part} {year}", "%b %d %Y")
+        date_part = dt.strftime("%d %b %Y")
+    except ValueError:
+        pass
+    return f"{date_part} {ampm}"
+
+
+def cmd_dutyramessage(chat_id, args, user_id, user_name):
     duty_slot = datetime.datetime.now(SGT).strftime("%d %b %Y")
     if args and args[0]:
         duty_slot += " " + args[0]
     else:
         duty_slot += " PM"
-    msg = f"""I ({user_name}) am the duty RA for {duty_slot}.\n\nI have collected the Duty RA phone from the letterbox. I will be staying in the building until the duty time is over.{RAsIn}
-    """
-    send_message(chat_id, msg)
+    send_message(chat_id, build_dutyramessage(user_name, duty_slot))
 
 
 def try_handle_reply(chat_id, text, user_id, user_name):
@@ -236,6 +257,8 @@ def send_duty_reminders():
             if chat_id:
                 msg = f"👋 Hi {person}, you have a duty scheduled for *{slot}* tomorrow. Please be prepared!"
                 send_message(chat_id, msg)
+                template_msg = build_dutyramessage(person, _slot_to_duty_slot_str(slot), include_ra_list=False)
+                send_message(chat_id, f"📋 Here's your duty message template for tomorrow, ready to copy-paste when your duty starts:\n\n{template_msg}")
                 reminder_sent = True
                 r.set("reminder_sent", tomorrow_str)
 
