@@ -18,7 +18,7 @@ GROUP_CHAT_ID = os.getenv("GROUP_CHAT_ID")
 # The group has Topics enabled. When set, all bot messages to the group are routed
 # into this topic thread instead of the General thread. Update if the topic changes,
 # or set to None to send to the General thread.
-GROUP_TOPIC_ID = None
+GROUP_TOPIC_ID = 2146
 FRIEND_TELEGRAM_IDS = json.loads(os.getenv("FRIEND_TELEGRAM_MAPPINGS"))
 
 # Explicit display order for RA names in listings (e.g. /swap_duty), independent
