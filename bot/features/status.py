@@ -62,6 +62,22 @@ def _schedule_label(suffix):
     return next((label for label, s in SCHEDULE_TARGETS.items() if s == suffix), suffix)
 
 
+def _stay_in_personnel(date_str):
+    """Return {zone_label: names} for every zone in SCHEDULE_TARGETS whose
+    zone_schedule_<suffix> has a slot starting with date_str ('%b %d').
+    Zone schedules only contain weekend entries, so this is naturally empty
+    on weekdays."""
+    stay_in = {}
+    for label, suffix in SCHEDULE_TARGETS.items():
+        if suffix == "duty":
+            continue
+        zone_schedule = load_schedule(_schedule_redis_key(suffix))
+        names = [name for slot, name in zone_schedule.items() if slot.startswith(date_str)]
+        if names:
+            stay_in[label] = ", ".join(names)
+    return stay_in
+
+
 def _schedule_selection_keyboard(callback_prefix, cancel_data=None):
     labels = list(SCHEDULE_TARGETS.items())
     rows = [
@@ -90,20 +106,27 @@ def cmd_update_schedule(chat_id, args, user_id, user_name):
         send_message(chat_id, "📋 Which schedule do you want to update?", reply_markup=_schedule_selection_keyboard("update_target"))
 
 
-def build_dutyramessage(user_name, duty_slot, include_ra_list=True):
+def build_dutyramessage(user_name, duty_slot, include_ra_list=True, date_str=None):
     RAsIn = ""
     if include_ra_list:
-        r = get_redis()
-        statuses = r.hgetall("user_status")
-        listStatus = sorted(statuses.items())
-        duty_schedule = load_duty_schedule()
-        if should_trigger_refresh(duty_schedule):
-            RAsIn = "\n\nRAs/RFs in the building:\n"
-            count = 1
-            for k, v in listStatus:
-                if v == "IN":
-                    RAsIn += f"{count}) {k}\n"
-                    count += 1
+        date_str = date_str or datetime.datetime.now(SGT).strftime("%b %d")
+        stay_in = _stay_in_personnel(date_str)
+        if stay_in:
+            RAsIn = "\n\nRAs/RFs in the building:\n" + "\n".join(
+                f"{i}) {names} ({zone})" for i, (zone, names) in enumerate(stay_in.items(), 1)
+            )
+        else:
+            r = get_redis()
+            statuses = r.hgetall("user_status")
+            listStatus = sorted(statuses.items())
+            duty_schedule = load_duty_schedule()
+            if should_trigger_refresh(duty_schedule):
+                RAsIn = "\n\nRAs/RFs in the building:\n"
+                count = 1
+                for k, v in listStatus:
+                    if v == "IN":
+                        RAsIn += f"{count}) {k}\n"
+                        count += 1
     return f"""I ({user_name}) am the duty RA for {duty_slot}.\n\nI have collected the Duty RA phone from the letterbox. I will be staying in the building until the duty time is over.{RAsIn}
     """
 
@@ -257,7 +280,7 @@ def send_duty_reminders():
             if chat_id:
                 msg = f"👋 Hi {person}, you have a duty scheduled for *{slot}* tomorrow. Please be prepared!"
                 send_message(chat_id, msg)
-                template_msg = build_dutyramessage(person, _slot_to_duty_slot_str(slot), include_ra_list=False)
+                template_msg = build_dutyramessage(person, _slot_to_duty_slot_str(slot), include_ra_list=False, date_str=tomorrow_str)
                 send_message(chat_id, f"📋 Here's your duty message template for tomorrow, ready to copy-paste when your duty starts:\n\n{template_msg}")
                 reminder_sent = True
                 r.set("reminder_sent", tomorrow_str)
