@@ -76,3 +76,19 @@ SCHOOL_HOLIDAYS = [
     ("2026-12-06", "2027-01-10"),  # 6 December 2026 - 10 January 2027
     ("2027-05-09", "2027-08-01"),  # 9 May 2027 - 1 August 2027
 ]
+
+RA_GROUPINGS = {"Anderson": "Aquila",
+                "Shi Hui": "Aquila",
+                "Zedd": "Aquila",
+                "Siyu": "Noctua",
+                "Brendon": "Noctua",
+                "Nicole": "Noctua",
+                "Kasthuri": "Ursa",
+                "Yap Han": "Ursa",
+                "Don": "Ursa",
+                "Liya": "Leo",
+                "Jin Xian": "Leo",
+                "Zhen Jie": "Leo",
+                "Jeana": "Draco",
+                "Choon Heng": "Draco",
+                "Lex": "Draco"}

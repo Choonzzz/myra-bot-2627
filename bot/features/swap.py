@@ -1,61 +1,85 @@
 # features/swap.py
 import json
 
-from redis_client import load_duty_schedule, get_redis
-from config import GROUP_CHAT_ID, FRIEND_TELEGRAM_IDS, ordered_friend_names
+from redis_client import load_schedule, get_redis, schedule_redis_key
+from config import GROUP_CHAT_ID, FRIEND_TELEGRAM_IDS, ordered_friend_names, RA_GROUPINGS, SCHEDULE_TARGETS
 from telegram_api import send_message, inline_keyboard, edit_message_reply_markup
 
 
+def _schedule_label(schedule_key):
+    return next(
+        (label for label, suffix in SCHEDULE_TARGETS.items() if schedule_redis_key(suffix) == schedule_key),
+        schedule_key
+    )
+
+
+def _user_zone_schedule_key(user_name):
+    group = RA_GROUPINGS.get(user_name)
+    suffix = SCHEDULE_TARGETS.get(group) if group else None
+    return schedule_redis_key(suffix) if suffix else None
+
+
+def _swap_type_keyboard(prefix, cancel_data):
+    return inline_keyboard([
+        [("Admin Duty", f"{prefix}:duty"), ("Weekend Stay In", f"{prefix}:weekend")],
+        [("❌ Cancel", cancel_data)]
+    ])
+
+
 def cmd_swap_duty(chat_id, args, user_id, user_name):
-    msg = "🔁 *Who do you want to swap with?*\n" + "\n".join([f"• {name} → type `/swap {name}`" for name in ordered_friend_names()])
-    send_message(chat_id, msg, reply_markup=inline_keyboard([[("❌ Cancel", "cancel:swap")]]))
-
-
-def cmd_swap(chat_id, args, user_id, user_name):
-    r = get_redis()
-    if not args:
-        send_message(chat_id, "❌ Please specify a name. Use /swap_duty to view names.")
-        return
-    target = " ".join(args)
-    duty_schedule = load_duty_schedule()
-    target_duties = [slot for slot, name in duty_schedule.items() if name == target]
-    if not target_duties:
-        send_message(chat_id, f"❌ {target} has no assigned duties.")
-        return
-    msg = f"📋 *{target}'s Duties - Choose one to swap:*\n\n"
-    for i, duty in enumerate(target_duties, 1):
-        msg += f"{i}. {duty}\n"
-    msg += "\n📝 Reply to this message with the number of your choice."
-    r.hset("user_swap_state", str(user_id), target)
-    send_message(chat_id, msg, reply_markup=inline_keyboard([[("❌ Cancel", "cancel:swap")]]))
+    send_message(chat_id, "🔁 *Swap which duty?*", reply_markup=_swap_type_keyboard("swap_type", "cancel:swap"))
 
 
 def cmd_cover_duty(chat_id, args, user_id, user_name):
+    send_message(chat_id, "🔁 *Cover which duty?*", reply_markup=_swap_type_keyboard("cover_type", "cancel:cover"))
+
+
+def _start_swap_duty(chat_id, user_id, user_name, schedule_key):
     r = get_redis()
-    duty_schedule = load_duty_schedule()
-    if not duty_schedule:
+    if schedule_key == schedule_redis_key("duty"):
+        candidates = ordered_friend_names()
+    else:
+        group = RA_GROUPINGS.get(user_name)
+        candidates = [name for name in ordered_friend_names() if RA_GROUPINGS.get(name) == group]
+
+    r.hset("pending_swap_schedule", str(user_id), schedule_key)
+    msg = f"🔁 *Who do you want to swap {_schedule_label(schedule_key)} with?*"
+    rows = [
+        [(name, f"swap_target:{name}") for name in candidates[i:i + 2]]
+        for i in range(0, len(candidates), 2)
+    ]
+    rows.append([("❌ Cancel", "cancel:swap")])
+    send_message(chat_id, msg, reply_markup=inline_keyboard(rows))
+
+
+def _start_cover_duty(chat_id, user_id, user_name, schedule_key):
+    r = get_redis()
+    schedule = load_schedule(schedule_key)
+    if not schedule:
         send_message(chat_id, "❌ No duty schedule available.")
         return
-    msg = "📋 *All Duty Slots - Choose one to cover:*\n\n"
-    for i, (slot, name) in enumerate(duty_schedule.items(), 1):
+    msg = f"📋 *All {_schedule_label(schedule_key)} Slots - Choose one to cover:*\n\n"
+    for i, (slot, name) in enumerate(schedule.items(), 1):
         msg += f"{i}. {slot} ({name})\n"
     msg += "\n📝 Reply to this message with the number of your choice."
-    r.hset("user_cover_state", str(user_id), "waiting_for_slot_choice")
+    r.hset("user_cover_state", str(user_id), schedule_key)
     send_message(chat_id, msg, reply_markup=inline_keyboard([[("❌ Cancel", "cancel:cover")]]))
 
 
 def _try_handle_cover_reply(r, chat_id, text, user_id, user_name):
-    if r.hget("user_cover_state", str(user_id)) == "waiting_for_slot_choice":
+    schedule_key = r.hget("user_cover_state", str(user_id))
+    if schedule_key:
+        schedule_key = schedule_key.decode() if isinstance(schedule_key, bytes) else schedule_key
         try:
             choice = int(text.strip())
-            duty_schedule = json.loads(r.get("duty_schedule") or '{}')
-            duties = list(duty_schedule.items())
+            schedule = json.loads(r.get(schedule_key) or '{}')
+            duties = list(schedule.items())
             if 1 <= choice <= len(duties):
                 selected_slot, original = duties[choice - 1]
-                duty_schedule[selected_slot] = user_name
-                r.set("duty_schedule", json.dumps(duty_schedule))
+                schedule[selected_slot] = user_name
+                r.set(schedule_key, json.dumps(schedule))
                 r.hdel("user_cover_state", str(user_id))
-                msg = f"✅ *Duty Cover Completed!*\n\n📅 {selected_slot}: {user_name} (covering for {original})"
+                msg = f"✅ *{_schedule_label(schedule_key)} Cover Completed!*\n\n📅 {selected_slot}: {user_name} (covering for {original})"
                 send_message(chat_id, msg)
                 send_message(GROUP_CHAT_ID, msg)
             else:
@@ -71,18 +95,19 @@ def _try_handle_swap_choice_reply(r, chat_id, text, user_id, user_name):
     if not swap_state:
         return False
 
-    duty_schedule = json.loads(r.get("duty_schedule") or '{}')
     state = swap_state.decode() if isinstance(swap_state, bytes) else swap_state
+    schedule_key, rest = state.split("::", 1)
+    schedule = json.loads(r.get(schedule_key) or '{}')
 
-    if "|" not in state:
+    if "|" not in rest:
         # User is choosing target's duty slot
-        target = state
-        target_duties = [slot for slot, name in duty_schedule.items() if name == target]
+        target = rest
+        target_duties = [slot for slot, name in schedule.items() if name == target]
         try:
             choice = int(text.strip())
             if 1 <= choice <= len(target_duties):
                 target_slot = target_duties[choice - 1]
-                requester_duties = [slot for slot, name in duty_schedule.items() if name == user_name]
+                requester_duties = [slot for slot, name in schedule.items() if name == user_name]
                 if not requester_duties:
                     send_message(chat_id, "❌ You have no duties to swap.")
                     r.hdel("user_swap_state", str(user_id))
@@ -93,7 +118,7 @@ def _try_handle_swap_choice_reply(r, chat_id, text, user_id, user_name):
                     msg += f"{i}. {duty}\n"
                 msg += "\n📝 Reply to this message with the number of your choice."
 
-                new_state = f"{target}|{target_slot}"
+                new_state = f"{schedule_key}::{target}|{target_slot}"
                 r.hset("user_swap_state", str(user_id), new_state)
                 send_message(chat_id, msg, reply_markup=inline_keyboard([[("❌ Cancel", "cancel:swap")]]))
             else:
@@ -102,8 +127,8 @@ def _try_handle_swap_choice_reply(r, chat_id, text, user_id, user_name):
             send_message(chat_id, "❌ Please enter a valid number.")
     else:
         # User is choosing their own duty to swap
-        target, target_slot = state.split("|", 1)
-        requester_duties = [slot for slot, name in duty_schedule.items() if name == user_name]
+        target, target_slot = rest.split("|", 1)
+        requester_duties = [slot for slot, name in schedule.items() if name == user_name]
         try:
             choice = int(text.strip())
             if 1 <= choice <= len(requester_duties):
@@ -115,6 +140,7 @@ def _try_handle_swap_choice_reply(r, chat_id, text, user_id, user_name):
 
                 # Store swap request for target to respond to
                 swap_data = json.dumps({
+                    "schedule_key": schedule_key,
                     "requester": user_name,
                     "target": target,
                     "requester_slot": requester_slot,
@@ -124,7 +150,7 @@ def _try_handle_swap_choice_reply(r, chat_id, text, user_id, user_name):
                 })
                 r.hset("active_swap_requests", target_chat_id, swap_data)
 
-                msg = f"""🔄 *Duty Swap Request*
+                msg = f"""🔄 *{_schedule_label(schedule_key)} Swap Request*
 
 👤 From: {user_name}
 📅 They want to swap:
@@ -152,9 +178,10 @@ def try_handle_reply(chat_id, text, user_id, user_name):
     return False
 
 
-def try_handle_callback(data, chat_id, user_id, message_id):
-    """Handles the Cancel button on /cover_duty and /swap prompts, and the
-    Yes/No buttons on a swap request DM."""
+def try_handle_callback(data, chat_id, user_id, message_id, user_name):
+    """Handles the Admin/Weekend type buttons on /swap_duty and /cover_duty,
+    the swap-target person buttons, the Cancel buttons, and the Yes/No
+    buttons on a swap request DM."""
     r = get_redis()
 
     if data == "cancel:cover":
@@ -165,8 +192,50 @@ def try_handle_callback(data, chat_id, user_id, message_id):
 
     if data == "cancel:swap":
         r.hdel("user_swap_state", str(user_id))
+        r.hdel("pending_swap_schedule", str(user_id))
         edit_message_reply_markup(chat_id, message_id)
         send_message(chat_id, "❌ Swap cancelled.")
+        return True
+
+    if data.startswith("swap_type:") or data.startswith("cover_type:"):
+        is_swap = data.startswith("swap_type:")
+        suffix = data.split(":", 1)[1]
+        edit_message_reply_markup(chat_id, message_id)
+        if suffix == "duty":
+            schedule_key = schedule_redis_key("duty")
+        else:
+            schedule_key = _user_zone_schedule_key(user_name)
+            if not schedule_key:
+                send_message(chat_id, "❌ You're not assigned to a stay-in group yet.")
+                return True
+        if is_swap:
+            _start_swap_duty(chat_id, user_id, user_name, schedule_key)
+        else:
+            _start_cover_duty(chat_id, user_id, user_name, schedule_key)
+        return True
+
+    if data.startswith("swap_target:"):
+        target = data.split("swap_target:", 1)[1]
+        schedule_key = r.hget("pending_swap_schedule", str(user_id))
+        edit_message_reply_markup(chat_id, message_id)
+        if not schedule_key:
+            send_message(chat_id, "❌ Session expired. Please start again with /swap_duty.")
+            return True
+        schedule_key = schedule_key.decode() if isinstance(schedule_key, bytes) else schedule_key
+        r.hdel("pending_swap_schedule", str(user_id))
+
+        schedule = load_schedule(schedule_key)
+        target_duties = [slot for slot, name in schedule.items() if name == target]
+        if not target_duties:
+            send_message(chat_id, f"❌ {target} has no assigned duties.")
+            return True
+
+        msg = f"📋 *{target}'s Duties - Choose one to swap:*\n\n"
+        for i, duty in enumerate(target_duties, 1):
+            msg += f"{i}. {duty}\n"
+        msg += "\n📝 Reply to this message with the number of your choice."
+        r.hset("user_swap_state", str(user_id), f"{schedule_key}::{target}")
+        send_message(chat_id, msg, reply_markup=inline_keyboard([[("❌ Cancel", "cancel:swap")]]))
         return True
 
     if data in ("swap_resp:yes", "swap_resp:no"):
@@ -179,11 +248,12 @@ def try_handle_callback(data, chat_id, user_id, message_id):
         edit_message_reply_markup(chat_id, message_id)
 
         if data == "swap_resp:yes":
-            duty_schedule = json.loads(r.get("duty_schedule") or '{}')
-            duty_schedule[swap_data["requester_slot"]] = swap_data["target"]
-            duty_schedule[swap_data["target_slot"]] = swap_data["requester"]
-            r.set("duty_schedule", json.dumps(duty_schedule))
-            msg = f"✅ *Duty Swap Completed!*\n\n📅 {swap_data['requester_slot']}: {swap_data['target']}\n📅 {swap_data['target_slot']}: {swap_data['requester']}"
+            schedule_key = swap_data["schedule_key"]
+            schedule = json.loads(r.get(schedule_key) or '{}')
+            schedule[swap_data["requester_slot"]] = swap_data["target"]
+            schedule[swap_data["target_slot"]] = swap_data["requester"]
+            r.set(schedule_key, json.dumps(schedule))
+            msg = f"✅ *{_schedule_label(schedule_key)} Swap Completed!*\n\n📅 {swap_data['requester_slot']}: {swap_data['target']}\n📅 {swap_data['target_slot']}: {swap_data['requester']}"
             send_message(chat_id, msg)
             send_message(swap_data["requester_chat_id"], msg)
             send_message(GROUP_CHAT_ID, msg)
@@ -199,6 +269,5 @@ def try_handle_callback(data, chat_id, user_id, message_id):
 
 COMMANDS = {
     "/swap_duty": cmd_swap_duty,
-    "/swap": cmd_swap,
     "/cover_duty": cmd_cover_duty,
 }

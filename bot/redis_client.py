@@ -14,3 +14,6 @@ def load_schedule(key):
     r = get_redis()
     json_data = r.get(key)
     return json.loads(json_data or "{}")
+
+def schedule_redis_key(suffix):
+    return "duty_schedule" if suffix == "duty" else f"zone_schedule_{suffix}"

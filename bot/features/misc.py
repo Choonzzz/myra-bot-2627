@@ -133,9 +133,8 @@ def cmd_help(chat_id, args, user_id, user_name):
 # Duties
 • `/view_schedule` – View full duty schedule
 • `/view_mine` – View your assigned slots
-• `/swap_duty` – Start duty swap request
-• `/swap <name>` – Request a swap with a specific person
-• `/cover_duty` – Cover someone's duty slot
+• `/swap_duty` – Start a duty swap request (choose Admin Duty or Weekend Stay In, then pick who to swap with via buttons)
+• `/cover_duty` – Cover a duty slot (choose Admin Duty or Weekend Stay In, then pick a slot)
 • `/dutyramessage [AM|PM]` – Generate the duty RA message, delete AM/PM where applicable
 
 # Fluff

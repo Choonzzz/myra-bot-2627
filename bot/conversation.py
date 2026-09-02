@@ -84,5 +84,5 @@ def handle_callback_query(callback_query):
 
     if status.try_handle_callback(data, chat_id, user_id, message_id, user_name):
         return
-    if swap.try_handle_callback(data, chat_id, user_id, message_id):
+    if swap.try_handle_callback(data, chat_id, user_id, message_id, user_name):
         return

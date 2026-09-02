@@ -2,7 +2,7 @@
 import datetime
 import json
 
-from redis_client import load_duty_schedule, load_schedule, get_redis
+from redis_client import load_duty_schedule, load_schedule, get_redis, schedule_redis_key
 from scheduler import should_trigger_refresh
 from config import GROUP_CHAT_ID, FRIEND_TELEGRAM_IDS, RA_DISPLAY_ORDER, ADMIN_NAMES, SCHEDULE_TARGETS, SGT
 from telegram_api import send_message, inline_keyboard, edit_message_reply_markup
@@ -55,7 +55,7 @@ def cmd_view_mine(chat_id, args, user_id, user_name):
 
 
 def _schedule_redis_key(suffix):
-    return "duty_schedule" if suffix == "duty" else f"zone_schedule_{suffix}"
+    return schedule_redis_key(suffix)
 
 
 def _schedule_label(suffix):
