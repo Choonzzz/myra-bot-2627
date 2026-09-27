@@ -54,6 +54,32 @@ def cmd_view_mine(chat_id, args, user_id, user_name):
     send_message(chat_id, msg)
 
 
+TELEGRAM_MAX_MESSAGE_LENGTH = 4096
+
+def cmd_export_schedule(chat_id, args, user_id, user_name):
+    if user_name not in ADMIN_NAMES:
+        send_message(chat_id, "❌ Only admins can use this command.")
+        return
+    duty_schedule = load_duty_schedule()
+    if not duty_schedule:
+        send_message(chat_id, "❌ No duty schedule available.")
+        return
+
+    # Sent as plain text (no Markdown) so the dict can be copied straight back into /update_schedule.
+    # Split on ", " between entries if it exceeds Telegram's message length limit.
+    text = str(duty_schedule)
+    chunks = []
+    while len(text) > TELEGRAM_MAX_MESSAGE_LENGTH:
+        cut = text.rfind(", ", 0, TELEGRAM_MAX_MESSAGE_LENGTH)
+        if cut == -1:
+            cut = TELEGRAM_MAX_MESSAGE_LENGTH - 2
+        chunks.append(text[:cut + 2])
+        text = text[cut + 2:]
+    chunks.append(text)
+    for chunk in chunks:
+        send_message(chat_id, chunk, parse_mode=None)
+
+
 def _schedule_redis_key(suffix):
     return schedule_redis_key(suffix)
 
@@ -298,5 +324,6 @@ COMMANDS = {
     "/view_schedule": cmd_view_schedule,
     "/view_mine": cmd_view_mine,
     "/update_schedule": cmd_update_schedule,
+    "/export_schedule": cmd_export_schedule,
     "/dutyramessage": cmd_dutyramessage,
 }

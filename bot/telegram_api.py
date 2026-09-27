@@ -6,9 +6,10 @@ from config import TELEGRAM_API_URL, FRIEND_TELEGRAM_IDS, GROUP_CHAT_ID, GROUP_T
 def send_message(chat_id, text, parse_mode="Markdown", reply_markup=None):
     payload = {
         "chat_id": chat_id,
-        "text": text,
-        "parse_mode": parse_mode
+        "text": text
     }
+    if parse_mode:
+        payload["parse_mode"] = parse_mode
     if str(chat_id) == GROUP_CHAT_ID and GROUP_TOPIC_ID is not None:
         payload["message_thread_id"] = GROUP_TOPIC_ID
     if reply_markup:

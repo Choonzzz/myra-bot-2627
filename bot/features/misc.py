@@ -145,7 +145,8 @@ def cmd_help(chat_id, args, user_id, user_name):
 
 # Admin Usage
 • `/refresh` – Ask all users to update whether they're IN or OUT
-• `/update_schedule` – Replace schedule"""
+• `/update_schedule` – Replace schedule
+• `/export_schedule` – Output the full Admin Duty schedule as a Python dict"""
     send_message(chat_id, msg)
 
 # Put this back in if you ever make this work again.
